@@ -3,36 +3,30 @@ const app = express();
 const colors = require('colors');
 var targetBaseUrl = process.env.REDIRECT_URL;
 var pdfreader = require('pdfreader');
+var readline = require('readline');
 
-// const targetBaseUrl = 'https://dev.creditculture.sg';
-
-
-
-// let fs = require('fs'),
-//         PDFParser = require("pdf2json");
-
-//     let pdfParser = new PDFParser();
-
-//     pdfParser.loadPDF("CBSReport.pdf");
-//     pdfParser.on("pdfParser_dataError", errData => console.error(errData.parserError) );
-//     pdfParser.on("pdfParser_dataReady", pdfData => {
-//         fs.writeFile("CBSReport.json", JSON.stringify(pdfData));
-//     });
-// stopWords =['DataProvided','']
-
-
-
-searchStrings = [
-  { searchStr: 'EnquiryNumber', algo: 'getnumber' },
-  { searchStr: 'Print Friendly', algo: 'getpostdate' },
-  { searchStr: 'EnquiryDate', algo: 'getenquirydate' },
-  { searchStr: 'EnquiryDate', algo: 'stopword' },
-
-]
 var text = '';
 var fs = require("fs");
 var results = new Array();
-var names = new Array();
+var searchName = new Array();
+var finalresult = new Array();
+var finaljsonresult = new Array();
+var finaljsonresult1 = new Array();
+
+process.argv.forEach((val, index) => {
+  console.log(`${index}: ${val}`)
+})
+
+var filename = process.argv[2];
+console.log('filename', filename);
+readline.createInterface({
+  input: fs.createReadStream(filename),
+  terminal: false
+}).on('line', function (line) {
+  // console.log('Line: ' + line);
+  searchName.push(line);
+});
+
 fs.readFile("hearinglist.pdf", (err, pdfBuffer) => {
   // pdfBuffer contains the file content
 
@@ -46,7 +40,7 @@ fs.readFile("hearinglist.pdf", (err, pdfBuffer) => {
     }
     else if (!item) {
       // callback();
-      console.log("error");
+      // console.log("error");
       // console.log(text);
       //normalize
       console.log("normalize String");
@@ -55,12 +49,19 @@ fs.readFile("hearinglist.pdf", (err, pdfBuffer) => {
       //remove space
       // text = text.replace(/([A-Z])\s/g, '$1');
 
-      // console.log(text);
-      // allOccurences(text, 'Print Friendly');
       allOccurences(text, 'Bankruptcy Applications');
       // console.log (results);
-      DisplayDefendant(text);
+      DisplayDefendantApplicant(text);
       // DisplayApplicant(text);
+
+      CompareExactMatch();
+
+      ComparePartialMatch();
+
+      // MangleNamesMatch();
+
+      MangleNamesMatch1(); // mangleNamesMatch1 is more efficient as it using array rather than json objects
+
 
     }
     else if (item.text)
@@ -68,8 +69,40 @@ fs.readFile("hearinglist.pdf", (err, pdfBuffer) => {
   });
 });
 
+function ComparePartialMatch() {
+  // console.log ("hit compare");
+  for (var i = 0; i < finalresult.length; i++) {
+    for (var k = 0; k < searchName.length; k++) {
+      // console.log ("searchName: ",searchName[k]);
+      //hack
+      if (searchName[k]==undefined)
+        continue;
+      else if (finalresult[i].search(searchName[k]) >= 0 && finalresult[i] != searchName[k]) {
+        console.log("Partial match !!!! ", searchName[k]);
+        // should we delete the name for partial match 
+        // delete searchName[k];
+      }
+    }
+  }
+}
 
-function DisplayDefendant(text) {
+function CompareExactMatch() {
+  // console.log ("hit compare");
+  for (var i = 0; i < finalresult.length; i++) {
+    for (var k = 0; k < searchName.length; k++) {
+      if (finalresult[i] == searchName[k]) {
+        console.log("Exact match exists!!!! ", searchName[k]);
+        // should we delete the name for exact match 
+        delete searchName[k];
+      }
+    }
+  }
+}
+
+
+
+
+function DisplayDefendantApplicant(text) {
   var name = '';
   var n1 = 0
   var n2 = 0
@@ -81,9 +114,6 @@ function DisplayDefendant(text) {
     rawtext = text.substring(results[i], results[i + 1]);
     n1 = rawtext.search('DEFENDANT');
     n2 = rawtext.search('APPLICANT');
-    // console.log ("rawtext: ",rawtext);
-    // console.log ('defendant index',n1);
-    // console.log ('applicant index',n2);
     n = n1;
     if (n1 == -1) {
       n = n2;
@@ -98,54 +128,184 @@ function DisplayDefendant(text) {
     else if (n1 == -1 && n2 == -1) {
       console.log("*** error ****");
     }
-    // console.log ("value of n",n);
     var ending = rawtext.indexOf('(', n)
     name = rawtext.substring(n + 9, ending);
-    // console.log ('before: ',name);
-    // console.log ('ending:',ending);
     if (n >= 0) {
       // name =rawtext.substring(n+9, ending)
       if (name.search('Page') == 0) {
-        console.log("***need to use another alog****");
+        // console.log("***need to use another alog****");
         rawtext = text.substring(results[i - 1], results[i]);
         var start1 = rawtext.lastIndexOf(' V ');
         var end1 = rawtext.lastIndexOf('Bankruptcy Applications');
         name = rawtext.substring(start1 + 3, end1);
       }
     }
-
-    console.log(name);
+    name = removeExtraChars(name);
+    finalresult.push(name);
+    // finaljsonresult.push({ name: name, index: mangleNames(name) });
+    finaljsonresult1.push({ name:name, index: mangleNames1(name) });
+    // console.log(JSON.stringify(finaljsonresult1[i]));
   }
 }
 
-function DisplayApplicant(text) {
-  var name = '';
-  console.log('Display Defendants');
-  console.log('number:', results.length);
-  for (var i = 0; i < results.length; i++) {
-    // console.log(text.substr(results[i],results[i+1]));
-    var rawtext = text.substring(results[i], results[i + 1]);
-    var n = rawtext.search("APPLICANT");
-    var ending = rawtext.indexOf('(', n)
-    name = rawtext.substring(n + 9, ending);
-    if (n >= 0) {
-      // name =rawtext.substring(n+9, ending)
-      if (name.search('Page') == 0) {
-        console.log("***need to use another alog****");
-        rawtext = text.substring(results[i - 1], results[i]);
-        var start1 = rawtext.lastIndexOf(' V ');
-        var end1 = rawtext.lastIndexOf('Bankruptcy Applications');
-        name = rawtext.substring(start1 + 3, end1);
-        // console.log ("name hit",name);
-        console.log(name);
-      }
-      else
-        console.log(name);
+function mangleNames(text) {
+  //  text='ABC';
+  var bin = { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0, G: 0, H: 0, I: 0, J: 0, K: 0, L: 0, M: 0, N: 0, O: 0, P: 0, Q: 0, R: 0, S: 0, T: 0, U: 0, V: 0, W: 0, X: 0, Y: 0, Z: 0 }
+  for (var i = 0; i < text.length; i++) {
+    if (text[i] != ' ' && text[i] != '@' &&  text[i]!='/')
+      bin[text[i]] += 1;
+  }
+  return bin;
+}
+
+function mangleNames1(text){
+  var bin = [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, 0,  0,  0,  0,  0,  0, 0 ]
+  var charCode;
+
+  // console.log ("bin:",bin);
+  // if (text ='VENUS NEO KAI LING'){
+  //   console.log (text);
+  // }
+
+  for (var i = 0; i < text.length; i++) {
+    // console.log ("charcode:",text.charCodeAt(i))
+     charCode =text.charCodeAt(i)-65;
+    //  console.log (charCode);
+    if (charCode>=0 && charCode <26)
+      bin[charCode] += 1;
+  }
+  // console.log ("bin:",bin);
+  return bin;
+
+}
+
+function jsonCopy(src) {
+  return JSON.parse(JSON.stringify(src));
+}
+
+function MangleNamesMatch() {
+  console.log ("\nMangle Names Search\n");
+  var index;
+  var temp;
+  loop1:
+  for (var i = 0; i < finalresult.length; i++) {
+    console.log("searching against:", finalresult[i]);
+    // index = finaljsonresult[i].index;
+       index=jsonCopy(finaljsonresult[i].index);
+    // console.log ("what is index ",index);
+    // index=temp.index.slice;
+    // console.log("index:", index);
+    loop2:
+    for (var k = 0; k < searchName.length; k++) {
+      // console.log ("search string array ",searchName.length);
+      // index = finaljsonresult[i].index;
+      // console.log("search name ", searchName[k]);
+      // console.log("search string length ", searchName[k].length);
+      // console.log ('index :',index);
+      loop3:
+      for (var l = 0; l < searchName[k].length; l++) {
+        // index = finaljsonresult[i].index;
+        if (searchName[k][l] != ' ' && searchName[k][l] != '/' && searchName[k][l] != '@') {
+          // console.log("search name one char", searchName[k][l]);
+          // console.log("allowed");
+          index[searchName[k][l]] -= 1;
+          // console.log('value of l:', l);
+          if (index[searchName[k][l]] < 0) {
+            // console.log("breakout");
+            index=jsonCopy(finaljsonresult[i].index);
+            break loop3;
+          }
+
+          else if (l == searchName[k].length - 1) {
+            console.log('****match found for Mangle**** '+ searchName[k]+ " reference :"+finalresult[i] );
+            index=jsonCopy(finaljsonresult[i].index);
+          }
+        } // if ' ' and '@'
+      } // for l
+    } // for k
+  } // for i
+
+}
+
+function MangleNamesMatch1() {
+  console.log ("\nMangle Names Search\n");
+  var index;
+  var temp;
+  loop1:
+  for (var i = 0; i < finalresult.length; i++) {
+    // console.log("searching against:", finalresult[i]);
+       index=jsonCopy(finaljsonresult1[i].index);
+    loop2:
+    for (var k = 0; k < searchName.length; k++) {
+      if (searchName[k] ==undefined)
+      continue;
+      loop3:
+      for (var l = 0; l < searchName[k].length; l++) {
+        temp=searchName[k].charCodeAt(l)-65;
+        if (temp >=0 && temp <26) {
+          index[temp] -= 1;
+          if (index[temp] < 0) {
+            index=jsonCopy(finaljsonresult1[i].index);
+            break loop3;
+          }
+
+          else if (l == searchName[k].length - 1) {
+            console.log('****match found for Mangle**** '+ searchName[k]+ " reference :"+finalresult[i] );
+            index=jsonCopy(finaljsonresult1[i].index);
+            // index=Array.from(finaljsonresult1.index);
+          }
+        } // if ' ' and '@'
+      } // for l
+    } // for k
+  } // for i
+
+}
+
+function removeExtraChars(text) {
+  var end = text.lastIndexOf('Page');
+  if (end > 0) {
+    text = text.substring(0, end);
+  }
+  return text;
+}
+
+function removeExtras() {
+  for (var i = 0; i < finalresult.length; i++) {
+    var end = finalresult[i].lastIndexOf('Page');
+    if (end > 0) {
+      finalresult[i] = finalresult[i].substring(0, end);
     }
-
-    // console.log (name);
   }
 }
+
+// function DisplayApplicant(text) {
+//   var name = '';
+//   console.log('Display Defendants');
+//   console.log('number:', results.length);
+//   for (var i = 0; i < results.length; i++) {
+//     // console.log(text.substr(results[i],results[i+1]));
+//     var rawtext = text.substring(results[i], results[i + 1]);
+//     var n = rawtext.search("APPLICANT");
+//     var ending = rawtext.indexOf('(', n)
+//     name = rawtext.substring(n + 9, ending);
+//     if (n >= 0) {
+//       // name =rawtext.substring(n+9, ending)
+//       if (name.search('Page') == 0) {
+//         console.log("***need to use another alog****");
+//         rawtext = text.substring(results[i - 1], results[i]);
+//         var start1 = rawtext.lastIndexOf(' V ');
+//         var end1 = rawtext.lastIndexOf('Bankruptcy Applications');
+//         name = rawtext.substring(start1 + 3, end1);
+//         // console.log ("name hit",name);
+//         console.log(name);
+//       }
+//       else
+//         console.log(name);
+//     }
+
+//     // console.log (name);
+//   }
+// }
 
 function DisplayData(text) {
 
