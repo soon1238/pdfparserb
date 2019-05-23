@@ -12,10 +12,18 @@ var searchName = new Array();
 var finalresult = new Array();
 var finaljsonresult = new Array();
 var finaljsonresult1 = new Array();
+var datawrite = new Array();
 
-process.argv.forEach((val, index) => {
-  console.log(`${index}: ${val}`)
-})
+
+// process.argv.forEach((val, index) => {
+//   console.log(`${index}: ${val}`)
+
+// })
+
+if (process.argv.length <3){
+  console.log ("usage: node index.js <search filename>")
+  process.exit();
+} 
 
 var filename = process.argv[2];
 console.log('filename', filename);
@@ -54,6 +62,9 @@ fs.readFile("hearinglist.pdf", (err, pdfBuffer) => {
       DisplayDefendantApplicant(text);
       // DisplayApplicant(text);
 
+      // delete the file if exist
+      deleteFile('temp1.txt');
+
       CompareExactMatch();
 
       ComparePartialMatch();
@@ -62,6 +73,7 @@ fs.readFile("hearinglist.pdf", (err, pdfBuffer) => {
 
       MangleNamesMatch1(); // mangleNamesMatch1 is more efficient as it using array rather than json objects
 
+      // WriteContent();
 
     }
     else if (item.text)
@@ -75,10 +87,12 @@ function ComparePartialMatch() {
     for (var k = 0; k < searchName.length; k++) {
       // console.log ("searchName: ",searchName[k]);
       //hack
-      if (searchName[k]==undefined)
+      if (searchName[k] == undefined)
         continue;
       else if (finalresult[i].search(searchName[k]) >= 0 && finalresult[i] != searchName[k]) {
         console.log("Partial match !!!! ", searchName[k]);
+        // datawrite.push ("Partial match !!!! "+searchName[k]+'\r\n');
+        WriteText("Partial match !!!! " + searchName[k] + '\r\n');
         // should we delete the name for partial match 
         // delete searchName[k];
       }
@@ -92,14 +106,38 @@ function CompareExactMatch() {
     for (var k = 0; k < searchName.length; k++) {
       if (finalresult[i] == searchName[k]) {
         console.log("Exact match exists!!!! ", searchName[k]);
+        // datawrite.push ("Exact match exists!!!! "+searchName[k]+'\r\n');
         // should we delete the name for exact match 
+        WriteText("Exact match exists!!!! " + searchName[k] + '\r\n');
         delete searchName[k];
       }
     }
   }
 }
 
+function WriteContent() {
+  fs.writeFile("temp1.txt", datawrite, (err) => {
+    if (err) console.log(err);
+    console.log("Successfully Written to File.");
+  });
+}
 
+function WriteText(text) {
+  fs.appendFile("temp1.txt", text, (err) => {
+    if (err) console.log(err);
+    // console.log("Successfully Written to File.");
+  });
+}
+
+function deleteFile(filename) {
+  if (fs.existsSync(filename) ){
+    fs.unlinkSync(filename, function (err) {
+      if (err) throw err;
+      // if no error, file has been deleted successfully
+      console.log('File deleted!');
+    });
+  }
+}
 
 
 function DisplayDefendantApplicant(text) {
@@ -143,7 +181,7 @@ function DisplayDefendantApplicant(text) {
     name = removeExtraChars(name);
     finalresult.push(name);
     // finaljsonresult.push({ name: name, index: mangleNames(name) });
-    finaljsonresult1.push({ name:name, index: mangleNames1(name) });
+    finaljsonresult1.push({ name: name, index: mangleNames1(name) });
     // console.log(JSON.stringify(finaljsonresult1[i]));
   }
 }
@@ -152,26 +190,20 @@ function mangleNames(text) {
   //  text='ABC';
   var bin = { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0, G: 0, H: 0, I: 0, J: 0, K: 0, L: 0, M: 0, N: 0, O: 0, P: 0, Q: 0, R: 0, S: 0, T: 0, U: 0, V: 0, W: 0, X: 0, Y: 0, Z: 0 }
   for (var i = 0; i < text.length; i++) {
-    if (text[i] != ' ' && text[i] != '@' &&  text[i]!='/')
+    if (text[i] != ' ' && text[i] != '@' && text[i] != '/')
       bin[text[i]] += 1;
   }
   return bin;
 }
 
-function mangleNames1(text){
-  var bin = [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, 0,  0,  0,  0,  0,  0, 0 ]
+function mangleNames1(text) {
+  var bin = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   var charCode;
-
-  // console.log ("bin:",bin);
-  // if (text ='VENUS NEO KAI LING'){
-  //   console.log (text);
-  // }
-
   for (var i = 0; i < text.length; i++) {
     // console.log ("charcode:",text.charCodeAt(i))
-     charCode =text.charCodeAt(i)-65;
+    charCode = text.charCodeAt(i) - 65;
     //  console.log (charCode);
-    if (charCode>=0 && charCode <26)
+    if (charCode >= 0 && charCode < 26)
       bin[charCode] += 1;
   }
   // console.log ("bin:",bin);
@@ -184,41 +216,30 @@ function jsonCopy(src) {
 }
 
 function MangleNamesMatch() {
-  console.log ("\nMangle Names Search\n");
+  console.log("\nMangle Names Search\n");
   var index;
   var temp;
   loop1:
   for (var i = 0; i < finalresult.length; i++) {
     console.log("searching against:", finalresult[i]);
     // index = finaljsonresult[i].index;
-       index=jsonCopy(finaljsonresult[i].index);
-    // console.log ("what is index ",index);
-    // index=temp.index.slice;
-    // console.log("index:", index);
+    index = jsonCopy(finaljsonresult[i].index);
     loop2:
     for (var k = 0; k < searchName.length; k++) {
-      // console.log ("search string array ",searchName.length);
-      // index = finaljsonresult[i].index;
-      // console.log("search name ", searchName[k]);
-      // console.log("search string length ", searchName[k].length);
-      // console.log ('index :',index);
       loop3:
       for (var l = 0; l < searchName[k].length; l++) {
         // index = finaljsonresult[i].index;
         if (searchName[k][l] != ' ' && searchName[k][l] != '/' && searchName[k][l] != '@') {
-          // console.log("search name one char", searchName[k][l]);
-          // console.log("allowed");
           index[searchName[k][l]] -= 1;
-          // console.log('value of l:', l);
           if (index[searchName[k][l]] < 0) {
-            // console.log("breakout");
-            index=jsonCopy(finaljsonresult[i].index);
+            index = jsonCopy(finaljsonresult[i].index);
             break loop3;
           }
 
           else if (l == searchName[k].length - 1) {
-            console.log('****match found for Mangle**** '+ searchName[k]+ " reference :"+finalresult[i] );
-            index=jsonCopy(finaljsonresult[i].index);
+            console.log('****Mangle match**** ' + searchName[k] + " reference :" + finalresult[i]);
+            datawrite.push('****Mangle match**** ' + searchName[k] + " reference :" + finalresult[i]);
+            index = jsonCopy(finaljsonresult[i].index);
           }
         } // if ' ' and '@'
       } // for l
@@ -228,30 +249,32 @@ function MangleNamesMatch() {
 }
 
 function MangleNamesMatch1() {
-  console.log ("\nMangle Names Search\n");
+  console.log("\nMangle Names Search\n");
   var index;
   var temp;
   loop1:
   for (var i = 0; i < finalresult.length; i++) {
     // console.log("searching against:", finalresult[i]);
-       index=jsonCopy(finaljsonresult1[i].index);
+    index = jsonCopy(finaljsonresult1[i].index);
     loop2:
     for (var k = 0; k < searchName.length; k++) {
-      if (searchName[k] ==undefined)
-      continue;
+      if (searchName[k] == undefined)
+        continue;
       loop3:
       for (var l = 0; l < searchName[k].length; l++) {
-        temp=searchName[k].charCodeAt(l)-65;
-        if (temp >=0 && temp <26) {
+        temp = searchName[k].charCodeAt(l) - 65;
+        if (temp >= 0 && temp < 26) {
           index[temp] -= 1;
           if (index[temp] < 0) {
-            index=jsonCopy(finaljsonresult1[i].index);
+            index = jsonCopy(finaljsonresult1[i].index);
             break loop3;
           }
 
           else if (l == searchName[k].length - 1) {
-            console.log('****match found for Mangle**** '+ searchName[k]+ " reference :"+finalresult[i] );
-            index=jsonCopy(finaljsonresult1[i].index);
+            console.log('****match found for Mangle**** ' + searchName[k] + " reference :" + finalresult[i]);
+            // datawrite.push('****match found for Mangle**** '+ searchName[k]+ " reference :"+finalresult[i]+'\r\n');
+            WriteText('****match found for Mangle**** ' + searchName[k] + " reference :" + finalresult[i] + '\r\n');
+            index = jsonCopy(finaljsonresult1[i].index);
             // index=Array.from(finaljsonresult1.index);
           }
         } // if ' ' and '@'
@@ -337,26 +360,24 @@ function DisplayData(text) {
   });
 }
 
-function isDigit(aChar) {
-  myCharCode = aChar.charCodeAt(0);
+// function isDigit(aChar) {
+//   myCharCode = aChar.charCodeAt(0);
 
-  if ((myCharCode > 47) && (myCharCode < 58)) {
-    return true;
-  }
+//   if ((myCharCode > 47) && (myCharCode < 58)) {
+//     return true;
+//   }
+//   return false;
+// }
 
-  return false;
-}
-
-function isDate(aChar) {
-  // console.log ( "charCode:",aChar);
-  myCharCode = aChar.charCodeAt(0);
-  // console.log ( "charCode:",myCharCode);
-  if ((myCharCode > 47) && (myCharCode < 58) || aChar == '/' || aChar == '-') {
-    return true;
-  }
-
-  return false;
-}
+// function isDate(aChar) {
+//   // console.log ( "charCode:",aChar);
+//   myCharCode = aChar.charCodeAt(0);
+//   // console.log ( "charCode:",myCharCode);
+//   if ((myCharCode > 47) && (myCharCode < 58) || aChar == '/' || aChar == '-') {
+//     return true;
+//   }
+//   return false;
+// }
 
 // function upper_case(str) {
 //   regexp = /^[A-Z]/;
