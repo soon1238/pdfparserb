@@ -13,7 +13,7 @@
   "private": true,
   "dependencies": {
     "core-js": "^2.4.1",
-    "express": "^4.17.1",
+    "express": "^4.17.3",
     "pdf2json": "^1.1.8",
     "pdfreader": "^1.0.0",
     "rxjs": "^5.5.6",
